@@ -466,8 +466,16 @@ def show_predictions_page():
                     success, result = make_prediction(img_base64)
                     
                     if success:
-                        prediction = result['predicted_class']
+                        prediction_raw = result['predicted_class']
                         confidence = result['confidence']
+                        
+                        # Convert API format to display format
+                        if prediction_raw == "high_engagement":
+                            prediction = "High Engagement"
+                        elif prediction_raw == "low_engagement":
+                            prediction = "Low Engagement"
+                        else:
+                            prediction = prediction_raw  # fallback
                         
                         # Store in history
                         st.session_state.prediction_history.append({
@@ -541,6 +549,17 @@ def show_predictions_page():
         else:
             st.info("📝 No predictions yet. Upload an image to get started!")
 
+def trigger_model_retraining():
+    """Trigger model retraining via API"""
+    try:
+        response = requests.post(f"{st.session_state.api_url}/retrain/trigger", timeout=10)
+        if response.status_code == 200:
+            return True, response.json()
+        else:
+            return False, {"error": f"HTTP {response.status_code}: {response.text}"}
+    except requests.exceptions.RequestException as e:
+        return False, {"error": f"Connection error: {str(e)}"}
+
 def show_monitoring_page():
     """Enhanced monitoring page with real-time insights"""
     st.markdown("## 📊 System Monitoring & Analytics")
@@ -613,6 +632,61 @@ def show_monitoring_page():
         model_comparison.style.highlight_max(subset=['Accuracy', 'Precision', 'Recall', 'F1_Score'], color='lightgreen'),
         use_container_width=True
     )
+    
+    # Model Management Section
+    st.markdown("### 🔧 Model Management")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown("""
+        <div class="metric-card">
+            <h4>🚀 Model Retraining</h4>
+            <p>Trigger model retraining with new data to improve performance. This process will:</p>
+            <ul>
+                <li>📊 Load latest training data</li>
+                <li>🔄 Retrain the model with improved parameters</li>
+                <li>✅ Validate performance on test set</li>
+                <li>🔄 Update the production model if performance improves</li>
+            </ul>
+            <p><strong>Note:</strong> Retraining may take several minutes depending on data size.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("#### 🎛️ Retraining Controls")
+        
+        # Add warning about retraining
+        st.warning("⚠️ Retraining will temporarily affect the model's availability.")
+        
+        # Initialize retraining status in session state
+        if 'retraining_status' not in st.session_state:
+            st.session_state.retraining_status = None
+        
+        # Retraining button
+        if st.button("🚀 Start Retraining", type="primary", use_container_width=True):
+            with st.spinner("Initiating model retraining..."):
+                success, result = trigger_model_retraining()
+                
+                if success:
+                    st.session_state.retraining_status = "success"
+                    st.success("✅ Retraining initiated successfully!")
+                    st.json(result)
+                else:
+                    st.session_state.retraining_status = "error"
+                    st.error(f"❌ Retraining failed: {result.get('error', 'Unknown error')}")
+        
+        # Display last retraining status
+        if st.session_state.retraining_status == "success":
+            st.info("ℹ️ Last retraining: Successfully initiated")
+        elif st.session_state.retraining_status == "error":
+            st.error("ℹ️ Last retraining: Failed")
+        
+        # Clear status button
+        if st.session_state.retraining_status:
+            if st.button("🗑️ Clear Status", use_container_width=True):
+                st.session_state.retraining_status = None
+                st.rerun()
 
 def show_analytics_page():
     """Advanced analytics and insights page"""
