@@ -1,0 +1,10 @@
+# Streamlit Dashboard Dependencies
+streamlit==1.47.1
+pandas==2.0.3
+numpy==1.24.3
+plotly==5.15.0
+Pillow==10.0.0
+requests==2.31.0
+
+# Additional utilities
+python-dateutil==2.8.2
